@@ -1,0 +1,83 @@
+{{- $_ := required "existingSecret is required" .Values.existingSecret }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-backend
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "app.labels" (dict "Release" .Release "component" "backend" "version" .Values.backend.image.tag) | nindent 4 }}
+spec:
+  replicas: {{ .Values.backend.replicas }}
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      {{- include "app.selector" (dict "Release" .Release "component" "backend") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "app.labels" (dict "Release" .Release "component" "backend" "version" .Values.backend.image.tag) | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 20
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: {{ .Values.backend.runAsUser }}
+        runAsGroup: {{ .Values.backend.runAsGroup }}
+        fsGroup: {{ .Values.backend.fsGroup }}
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: backend
+          image: {{ include "app.backendImage" . }}
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          args: ["serve"]
+          ports:
+            - name: http
+              containerPort: {{ .Values.backend.service.port }}
+          env:
+            {{- include "app.backendEnv" . | nindent 12 }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.backend.healthPath }}
+              port: http
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.backend.healthPath }}
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.backend.livePath }}
+              port: http
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-backend
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "app.labels" (dict "Release" .Release "component" "backend" "version" .Values.backend.image.tag) | nindent 4 }}
+spec:
+  selector:
+    {{- include "app.selector" (dict "Release" .Release "component" "backend") | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.backend.service.port }}
+      targetPort: http

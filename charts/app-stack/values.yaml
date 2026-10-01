@@ -1,0 +1,101 @@
+# Образы, порты и ключи Secret. Паролей в этом файле нет.
+# Полный список ниже — то, что меняют при подстановке своего приложения.
+
+existingSecret: app-credentials
+
+postgres:
+  image: postgres:16-alpine
+  storage: 1Gi
+  storageClass: ""
+  userKey: postgres-user
+  passwordKey: postgres-password
+  databaseKey: postgres-database
+  runAsUser: 70
+  runAsGroup: 70
+  fsGroup: 70
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+
+rabbitmq:
+  image: rabbitmq:3.13-management-alpine
+  storage: 1Gi
+  storageClass: ""
+  userKey: rabbitmq-user
+  passwordKey: rabbitmq-password
+  vhostKey: rabbitmq-vhost
+  runAsUser: 100
+  runAsGroup: 101
+  fsGroup: 101
+  resources:
+    requests:
+      cpu: 50m
+      memory: 192Mi
+    limits:
+      memory: 768Mi
+
+backend:
+  image:
+    repository: ghcr.io/thepowerfulmark/k3s-gitops-platform-backend
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  replicas: 1
+  service:
+    port: 8080
+  healthPath: /health
+  livePath: /healthz
+  queue: items
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  secretEnv:
+    - name: POSTGRES_USER
+      key: postgres-user
+    - name: POSTGRES_PASSWORD
+      key: postgres-password
+    - name: POSTGRES_DB
+      key: postgres-database
+    - name: RABBITMQ_USER
+      key: rabbitmq-user
+    - name: RABBITMQ_PASSWORD
+      key: rabbitmq-password
+    - name: RABBITMQ_VHOST
+      key: rabbitmq-vhost
+  resources:
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
+frontend:
+  image:
+    repository: ghcr.io/thepowerfulmark/k3s-gitops-platform-frontend
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  replicas: 1
+  service:
+    port: 8080
+    nodePort: 30080
+  runAsUser: 101
+  runAsGroup: 101
+  fsGroup: 101
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 128Mi
+
+migrate:
+  backoffLimit: 6
+  activeDeadlineSeconds: 600
+
+networkPolicy:
+  enabled: true
+  # Пустое значение открывает порт frontend любому источнику.
+  # Хостовый файрвол ограничивается отдельно.
+  frontendIngressCIDR: ""

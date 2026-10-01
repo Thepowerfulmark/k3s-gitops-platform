@@ -1,0 +1,76 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-default-deny
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "app.labels" (dict "Release" .Release "component" "network" "version" .Chart.AppVersion) | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-allow-namespace
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "app.labels" (dict "Release" .Release "component" "network" "version" .Chart.AppVersion) | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector: {}
+  egress:
+    - to:
+        - podSelector: {}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-allow-dns
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "app.labels" (dict "Release" .Release "component" "network" "version" .Chart.AppVersion) | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-allow-frontend
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "app.labels" (dict "Release" .Release "component" "network" "version" .Chart.AppVersion) | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "app.selector" (dict "Release" .Release "component" "frontend") | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: {{ .Values.networkPolicy.frontendIngressCIDR | default "0.0.0.0/0" | quote }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.frontend.service.port }}
+{{- end }}

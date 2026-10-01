@@ -1,0 +1,47 @@
+{{- $tag := .Values.backend.image.tag | replace "." "-" | replace "_" "-" | lower -}}
+{{- $job := printf "%s-migrate-%s" .Release.Name $tag | trunc 63 | trimSuffix "-" -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $job }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "app.labels" (dict "Release" .Release "component" "migrate" "version" .Values.backend.image.tag) | nindent 4 }}
+spec:
+  backoffLimit: {{ .Values.migrate.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.migrate.activeDeadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        {{- include "app.labels" (dict "Release" .Release "component" "migrate" "version" .Values.backend.image.tag) | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: {{ .Values.backend.runAsUser }}
+        runAsGroup: {{ .Values.backend.runAsGroup }}
+        fsGroup: {{ .Values.backend.fsGroup }}
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: migrate
+          image: {{ include "app.backendImage" . }}
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          args: ["migrate"]
+          env:
+            {{- include "app.backendEnv" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

@@ -1,0 +1,100 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-frontend
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "app.labels" (dict "Release" .Release "component" "frontend" "version" .Values.frontend.image.tag) | nindent 4 }}
+data:
+  nginx.conf.template: |
+{{ include "app.nginxConfig" . | indent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-frontend
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "app.labels" (dict "Release" .Release "component" "frontend" "version" .Values.frontend.image.tag) | nindent 4 }}
+spec:
+  replicas: {{ .Values.frontend.replicas }}
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      {{- include "app.selector" (dict "Release" .Release "component" "frontend") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "app.labels" (dict "Release" .Release "component" "frontend" "version" .Values.frontend.image.tag) | nindent 8 }}
+      annotations:
+        checksum/nginx: {{ include "app.nginxConfig" . | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 15
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: {{ .Values.frontend.runAsUser }}
+        runAsGroup: {{ .Values.frontend.runAsGroup }}
+        fsGroup: {{ .Values.frontend.fsGroup }}
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: frontend
+          image: {{ include "app.frontendImage" . }}
+          imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.frontend.service.port }}
+          startupProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 5
+            failureThreshold: 12
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.frontend.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: nginx
+              mountPath: /etc/nginx/nginx.conf.template
+              subPath: nginx.conf.template
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: nginx
+          configMap:
+            name: {{ .Release.Name }}-frontend
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-frontend
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "app.labels" (dict "Release" .Release "component" "frontend" "version" .Values.frontend.image.tag) | nindent 4 }}
+spec:
+  type: NodePort
+  selector:
+    {{- include "app.selector" (dict "Release" .Release "component" "frontend") | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.frontend.service.port }}
+      targetPort: http
+      nodePort: {{ .Values.frontend.service.nodePort }}
