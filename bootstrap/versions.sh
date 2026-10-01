@@ -1,0 +1,5 @@
+# Pins used by the bootstrap scripts.
+K3S_VERSION=v1.36.4+k3s1
+HELM_VERSION=v3.22.0
+ARGOCD_VERSION=v2.13.3
+HEADLAMP_VERSION=v0.45.0
