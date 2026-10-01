@@ -76,7 +76,7 @@ http {
     server_name _;
     root /usr/share/nginx/html;
     resolver __NAMESERVER__ valid=5s ipv6=off;
-    set $backend_host {{ .Release.Name }}-backend;
+    set $backend_host {{ .Release.Name }}-backend.{{ .Release.Namespace }}.svc.cluster.local;
     location /api/ { proxy_pass http://$backend_host:{{ .Values.backend.service.port }}; }
     location = {{ .Values.backend.healthPath }} { proxy_pass http://$backend_host:{{ .Values.backend.service.port }}; }
     location = {{ .Values.backend.livePath }} { proxy_pass http://$backend_host:{{ .Values.backend.service.port }}; }
