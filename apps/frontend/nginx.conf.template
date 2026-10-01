@@ -18,10 +18,10 @@ http {
     server_name _;
     root /usr/share/nginx/html;
     resolver __NAMESERVER__ valid=5s ipv6=off;
-    set $upstream backend:8080;
-    location /api/ { proxy_pass http://$upstream; }
-    location = /health { proxy_pass http://$upstream; }
-    location = /healthz { proxy_pass http://$upstream; }
+    set $backend_host backend;
+    location /api/ { proxy_pass http://$backend_host:8080; }
+    location = /health { proxy_pass http://$backend_host:8080; }
+    location = /healthz { proxy_pass http://$backend_host:8080; }
     location / { try_files $uri /index.html; }
   }
 }

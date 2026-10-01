@@ -76,10 +76,10 @@ http {
     server_name _;
     root /usr/share/nginx/html;
     resolver __NAMESERVER__ valid=5s ipv6=off;
-    set $upstream {{ .Release.Name }}-backend:{{ .Values.backend.service.port }};
-    location /api/ { proxy_pass http://$upstream; }
-    location = {{ .Values.backend.healthPath }} { proxy_pass http://$upstream; }
-    location = {{ .Values.backend.livePath }} { proxy_pass http://$upstream; }
+    set $backend_host {{ .Release.Name }}-backend;
+    location /api/ { proxy_pass http://$backend_host:{{ .Values.backend.service.port }}; }
+    location = {{ .Values.backend.healthPath }} { proxy_pass http://$backend_host:{{ .Values.backend.service.port }}; }
+    location = {{ .Values.backend.livePath }} { proxy_pass http://$backend_host:{{ .Values.backend.service.port }}; }
     location / { try_files $uri /index.html; }
   }
 }
