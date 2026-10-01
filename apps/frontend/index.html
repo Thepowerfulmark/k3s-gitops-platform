@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Items</title>
+  <style>
+    :root { color-scheme: light; }
+    body { margin: 0; font: 16px/1.5 "Segoe UI", system-ui, sans-serif; background: #f4f6f8; color: #1c2430; }
+    main { max-width: 40rem; margin: 0 auto; padding: 2.5rem 1.25rem; }
+    h1 { font-size: 1.6rem; font-weight: 650; margin: 0 0 0.25rem; }
+    .lead { margin: 0 0 1.5rem; color: #52606d; }
+    form, ul, .status { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; }
+    form { display: flex; gap: 0.5rem; padding: 0.75rem; }
+    label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+    input { flex: 1; border: 1px solid #bcccdc; border-radius: 6px; padding: 0.55rem 0.7rem; font: inherit; }
+    button { border: 0; border-radius: 6px; padding: 0.55rem 0.95rem; background: #0b6e4f; color: #fff; font: inherit; cursor: pointer; }
+    ul { list-style: none; margin: 1rem 0 0; padding: 0; }
+    li { padding: 0.75rem 1rem; border-top: 1px solid #e4e7eb; }
+    li:first-child { border-top: 0; }
+    .status { margin-top: 1rem; padding: 0.65rem 1rem; color: #52606d; }
+    .err { color: #9b1c1c; }
+  </style>
+</head>
+<body>
+  <main id="app">
+    <h1>Items</h1>
+    <p class="lead">Demo API on this platform template.</p>
+    <form id="form">
+      <label for="name">Name</label>
+      <input id="name" name="name" maxlength="200" required placeholder="Name">
+      <button type="submit">Add</button>
+    </form>
+    <ul id="list"></ul>
+    <p class="status" id="status">Loading</p>
+  </main>
+  <script>
+    const list = document.querySelector("#list");
+    const status = document.querySelector("#status");
+    const nameInput = document.querySelector("#name");
+
+    function show(text, failed) {
+      status.textContent = text;
+      status.className = failed ? "status err" : "status";
+    }
+
+    async function reload() {
+      const res = await fetch("/api/items");
+      if (!res.ok) {
+        show("API is not ready.", true);
+        return;
+      }
+      const body = await res.json();
+      list.replaceChildren();
+      for (const item of body.items || []) {
+        const li = document.createElement("li");
+        li.textContent = item.name;
+        list.appendChild(li);
+      }
+      show(list.children.length ? "" : "No items yet.", false);
+    }
+
+    document.querySelector("#form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const res = await fetch("/api/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: nameInput.value })
+      });
+      if (!res.ok) {
+        show("Could not save the item.", true);
+        return;
+      }
+      nameInput.value = "";
+      await reload();
+    });
+
+    reload().catch(() => show("API is not ready.", true));
+  </script>
+</body>
+</html>
