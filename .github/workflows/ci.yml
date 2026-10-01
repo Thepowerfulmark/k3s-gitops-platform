@@ -1,0 +1,64 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*.*.*"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: install tools
+        run: |
+          curl -fsSL -o /tmp/shellcheck.tar.xz \
+            https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.x86_64.tar.xz
+          sudo tar -xJf /tmp/shellcheck.tar.xz -C /usr/local/bin --strip-components=1 shellcheck-v0.11.0/shellcheck
+          curl -fsSL -o /tmp/helm.tgz https://get.helm.sh/helm-v3.22.0-linux-amd64.tar.gz
+          tar -xzf /tmp/helm.tgz -C /tmp
+          sudo install -m 0755 /tmp/linux-amd64/helm /usr/local/bin/helm
+          curl -fsSL -o /tmp/kubeconform.tgz \
+            https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz
+          sudo tar -xzf /tmp/kubeconform.tgz -C /usr/local/bin kubeconform
+          curl -fsSL -o /tmp/gitleaks.tgz \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          sudo tar -xzf /tmp/gitleaks.tgz -C /usr/local/bin gitleaks
+
+      - name: unit tests
+        working-directory: apps/backend
+        run: python -m unittest discover -s tests -v
+
+      - name: shellcheck
+        run: |
+          shellcheck -x -P bootstrap \
+            bootstrap/install-k3s.sh \
+            bootstrap/install-helm.sh \
+            bootstrap/install-argocd.sh \
+            bootstrap/install-headlamp.sh \
+            security/host-firewall.sh
+          shellcheck -s sh apps/frontend/docker-entrypoint.sh
+
+      - name: helm lint
+        run: helm lint charts/app-stack
+
+      - name: kubeconform
+        run: |
+          helm template demo charts/app-stack --namespace demo \
+            | kubeconform -strict -summary -kubernetes-version 1.32.0
+          kubeconform -strict -summary -kubernetes-version 1.32.0 security/default-deny.yaml
+
+      - name: firewall check
+        run: ADMIN_CIDR=203.0.113.10/32 security/host-firewall.sh check
+
+      - name: gitleaks
+        run: gitleaks detect --source . --redact --no-banner
